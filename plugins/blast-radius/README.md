@@ -1,5 +1,14 @@
 # Blast Radius
 
+> **This is a modified copy** of [anthropics/claude-code-playground › blast-radius](https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods/blast-radius) (Apache-2.0), changed to hold fewer commands:
+>
+> - **Temp folders are never held.** That covers an `rm` whose every path sits inside `/tmp`, `/var/tmp`, `$TMPDIR` or a Claude job's `tmp` folder, and a `git reset --hard`, `git checkout -- .` or `git clean` in a repo inside one. A symlink in `/tmp` that points elsewhere doesn't count, and neither does the temp folder itself or a wildcard over all of it (`rm -rf /tmp/*`).
+> - **Only larger removals are held.** An `rm -r`/`rm -f` or `git clean` runs without a pane unless it would delete at least 20 files or 50 MB (`HOLD_MIN_FILES` and `HOLD_MIN_BYTES` in `hooks/blast-radius.mjs`). Paths that the shell expands (`$VAR`, `` `cmd` ``, `{a,b}`, `a\ b`), and trees too big to measure within 15 s, are still held.
+> - **No-ops aren't held.** That covers a `git reset --hard` or `git checkout -- .` with no uncommitted changes, a `git clean` with nothing to remove, and an `rm` of paths that don't exist.
+> - **Every risky part of a command line is checked**, not only the first, so a small `rm` can't let a big one later on the same line through.
+>
+> Force pushes, migrations and discarding uncommitted changes are held as before. The rest of this README is the upstream text. Where it lists what gets held, the rules above take precedence.
+
 A Claude Code mod that holds a risky shell command and shows you what it would change before it runs. We're sharing it as a small, complete example of a mod that pauses a tool call and asks you to decide.
 
 ## What this shows

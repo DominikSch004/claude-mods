@@ -38,13 +38,9 @@
     },
     {
       "name": "blast-radius",
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/anthropics/claude-code-playground.git",
-        "path": "claude-code/mods/blast-radius"
-      },
-      "description": "Holds risky shell commands (rm -rf, git reset --hard, force push, migrations) behind Proceed/Cancel.",
-      "homepage": "https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods/blast-radius"
+      "source": "./plugins/blast-radius",
+      "description": "Holds big rm -rf, git reset --hard, force pushes and migrations behind Proceed/Cancel. Skips temp folders and small removals.",
+      "homepage": "https://github.com/DominikSch004/claude-mods/tree/main/plugins/blast-radius"
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
   "name": "blast-radius",
-  "version": "0.1.0",
-  "description": "Holds risky shell commands (rm -rf, git reset --hard, git clean, force push, migrations) and shows what they would change, with Proceed and Cancel buttons.",
+  "version": "0.2.0",
+  "description": "Holds large or risky shell commands (big rm -rf, git reset --hard, git clean, force push, migrations) and shows what they would change, with Proceed and Cancel buttons. Temp folders and small removals pass through.",
   "author": {
     "name": "Claude Code DevRel"
   },

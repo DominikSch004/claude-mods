@@ -1,10 +1,14 @@
 // Copyright 2026 Anthropic PBC
 // SPDX-License-Identifier: Apache-2.0
 //
+// Modified 2026 by Dominik Schneider: removals inside a temp folder and small
+// removals run without a pane, and every risky part of a command line is checked.
+//
 // Blast Radius: holds a risky Bash command and shows what it would change.
 //
 // tool.call (Bash): if the command is risky, work out its blast radius, open a
-// pane with Proceed and Cancel, and hold the call until one is pressed.
+// pane with Proceed and Cancel, and hold the call until one is pressed. A
+// command whose blast radius turns out small (see HOLD_MIN_*) runs as normal.
 // ui.render (Pane): draws the report. If the surface won't place the pane (a
 // narrow terminal), the same report is drawn in the AbovePrompt band instead.
 //
@@ -19,14 +23,18 @@ const PANE_ID = "blast-radius";
 const POLL_SECONDS = "0.25";
 const HOLD_LIMIT_MS = 10 * 60 * 1000;
 const LIST_MAX = 10;
+// An rm or git clean is held only when it would delete at least this many
+// files, or at least this much data. Anything in a temp folder is never held.
+const HOLD_MIN_FILES = 20;
+const HOLD_MIN_BYTES = 50 * 1024 * 1024;
 
 // The call being held, or null. One at a time: Bash calls in a turn run in order.
 let held = null;
 
 export function register(on) {
   on("tool.call", { tool: "Bash" }, async ($, e, next) => {
-    const risk = classify(String(e.command ?? ""));
-    if (risk === null) {
+    const risks = classify(String(e.command ?? ""));
+    if (risks.length === 0) {
       return next(e);
     }
     // One hold at a time. If another risky call is already held (a subagent's,
@@ -38,39 +46,51 @@ export function register(on) {
       }
       await $.process.run(["sleep", POLL_SECONDS], { timeoutMs: 5000 });
     }
-    const mine = { command: String(e.command), risk, report: null, decision: null, where: "pane" };
+    const mine = { command: String(e.command), risk: risks[0], report: null, decision: null, where: "pane" };
     held = mine;
 
     let opened = { isPlaced: false };
     let decision;
-    let summary = risk.label;
+    let summary = risks[0].label;
     try {
-      // Measure where the command will run: the session folder, moved by any
-      // `cd dir &&` or `git -C dir` earlier in the same command line.
+      // Measure where each risky part will run: the session folder, moved by
+      // any `cd dir &&` or `git -C dir` earlier in the same command line. The
+      // first part that isn't small is the one the pane shows.
       const sessionCwd = await $.session.cwd();
-      const cwd = risk.dir ? await resolveDir($, sessionCwd, risk.dir) : sessionCwd;
-      mine.report = cwd === null
-        ? { summary: `${risk.label} in ${risk.dir}`, lines: [], note: `Couldn't find the folder ${risk.dir}, so I couldn't measure what this would change.` }
-        : await measure($, risk, cwd);
-      summary = mine.report.summary;
-
-      opened = await $.ui.open({ id: PANE_ID, title: "Blast Radius", focus: true, rows: paneRows(mine.report) });
-      if (!opened.isPlaced) {
-        mine.where = "band";
+      for (const risk of risks) {
+        const cwd = risk.dir ? await resolveDir($, sessionCwd, risk.dir) : sessionCwd;
+        const report = cwd === null
+          ? { summary: `${risk.label} in ${risk.dir}`, lines: [], note: `Couldn't find the folder ${risk.dir}, so I couldn't measure what this would change.` }
+          : await measure($, risk, cwd);
+        if (!report.small) {
+          mine.risk = risk;
+          mine.report = report;
+          break;
+        }
       }
-      $.ui.invalidate("ui.render");
 
-      const startedAt = await $.clock.now();
-      while (mine.decision === null) {
-        if (next.signal.aborted) {
-          mine.decision = "interrupted";
-          break;
+      if (mine.report === null) {
+        mine.decision = "small";
+      } else {
+        summary = mine.report.summary;
+        opened = await $.ui.open({ id: PANE_ID, title: "Blast Radius", focus: true, rows: paneRows(mine.report) });
+        if (!opened.isPlaced) {
+          mine.where = "band";
         }
-        if ((await $.clock.now()) - startedAt > HOLD_LIMIT_MS) {
-          mine.decision = "timeout";
-          break;
+        $.ui.invalidate("ui.render");
+
+        const startedAt = await $.clock.now();
+        while (mine.decision === null) {
+          if (next.signal.aborted) {
+            mine.decision = "interrupted";
+            break;
+          }
+          if ((await $.clock.now()) - startedAt > HOLD_LIMIT_MS) {
+            mine.decision = "timeout";
+            break;
+          }
+          await $.process.run(["sleep", POLL_SECONDS], { timeoutMs: 5000 });
         }
-        await $.process.run(["sleep", POLL_SECONDS], { timeoutMs: 5000 });
       }
     } catch {
       mine.decision = "error"; // anything unexpected refuses the command
@@ -91,6 +111,9 @@ export function register(on) {
       $.ui.invalidate("ui.render");
     }
 
+    if (decision === "small") {
+      return next(e);
+    }
     if (decision === "proceed") {
       $.ui.toast("Blast Radius: running it");
       return next(e);
@@ -136,8 +159,9 @@ function joinDir(dir, arg) {
   return dir ? `${dir}/${arg}` : arg;
 }
 
-/** The first risky segment of a shell command, or null. */
+/** Every risky segment of a shell command, in order. */
 function classify(command) {
+  const risks = [];
   let dir = null; // where a `cd` earlier on the line moved to; null means the session folder
   const scopes = []; // dir to restore when a ( subshell ) closes
   const pushed = []; // pushd stack, for popd
@@ -151,16 +175,15 @@ function classify(command) {
     }
     const risk = classifySegment(raw, dir, pushed);
     if (risk !== null && risk.cd === undefined) {
-      return risk;
-    }
-    if (risk !== null) {
+      risks.push(risk);
+    } else if (risk !== null) {
       dir = risk.cd; // a cd, pushd or popd moved the folder
     }
     for (let k = 0; k < closes && scopes.length > 0; k += 1) {
       dir = scopes.pop(); // a cd inside ( ... ) doesn't outlive it
     }
   }
-  return null;
+  return risks;
 }
 
 // Words that can come before the real command without changing what it does.
@@ -209,11 +232,13 @@ function classifySegment(segment, dir, pushed) {
       return { cd: pushed.length > 0 ? pushed.pop() : "-" };
     }
     if (cmd === "rm" || cmd.endsWith("/rm")) {
-      const flags = args.filter((a) => a.startsWith("-"));
+      // After `--` every word is a path, even one starting with -.
+      const end = args.includes("--") ? args.indexOf("--") : args.length;
+      const flags = args.slice(0, end).filter((a) => a.startsWith("-") && a !== "-");
       const recursive = flags.some((f) => f === "--recursive" || (/^-[^-]/.test(f) && /[rR]/.test(f)));
       const force = flags.some((f) => f === "--force" || (/^-[^-]/.test(f) && f.includes("f")));
       if (recursive || force) {
-        const targets = args.filter((a) => !a.startsWith("-") || a === "-");
+        const targets = [...args.slice(0, end).filter((a) => !a.startsWith("-") || a === "-"), ...args.slice(end + 1)];
         return { kind: "rm", label: `rm ${flags.join(" ")}`.trim(), targets, dir };
       }
     }
@@ -308,40 +333,105 @@ async function measure($, risk, cwd) {
   }
 }
 
+// Temp folders, and in_temp, which is true for a path strictly inside one: both
+// the path itself (its folder resolved) and whatever it points to. A link in
+// /tmp to a folder elsewhere doesn't count, and neither does /tmp itself.
+const TEMP_SH = `
+unset CDPATH
+temps=()
+for t in /tmp /var/tmp "\${TMPDIR:-}" \${CLAUDE_JOB_DIR:+"$CLAUDE_JOB_DIR/tmp"} "$HOME"/.claude/jobs/*/tmp; do
+  [[ -n "$t" ]] && t=$(cd -- "$t" 2>/dev/null && pwd -P) && [[ "$t" != / ]] && temps+=("$t")
+done
+in_temp() {
+  local name dir real full t a=0 b=0
+  name=$(basename -- "$1"); dir=$(dirname -- "$1")
+  [[ "$name" == . || "$name" == .. ]] && return 1
+  dir=$(cd -- "$dir" 2>/dev/null && pwd -P) || return 1
+  real="\${dir%/}/$name"
+  full=$(readlink -f -- "$1" 2>/dev/null) || return 1
+  for t in "\${temps[@]}"; do
+    [[ "$real" == "$t"/?* ]] && a=1
+    [[ "$full" == "$t"/?* ]] && b=1
+  done
+  (( a && b ))
+}
+`;
+
 // The paths are passed to bash as arguments, never as source, so nothing in
 // them runs. compgen -G expands a glob without command substitution.
+// Prints "files bytes paths in-temp", then the first files.
 const RM_SCRIPT = `
 shopt -s nullglob dotglob
+${TEMP_SH}
 paths=()
+intemp=1
 for p in "$@"; do
   case "$p" in "~"|"~/"*) p="$HOME\${p#\\~}";; esac
   if [[ "$p" == *[*?[]* ]]; then
-    while IFS= read -r m; do paths+=("$m"); done < <(compgen -G "$p")
+    # A wildcard over a whole temp folder (rm -rf /tmp/*) isn't scratch: it hits
+    # every other program's files too.
+    if [[ "\${p##*/}" =~ ^[*?.]+$ ]]; then
+      d=$(cd -- "$(dirname -- "$p")" 2>/dev/null && pwd -P)
+      for t in "\${temps[@]}"; do [[ "$d" == "$t" ]] && intemp=0; done
+    fi
+    while IFS= read -r m; do paths+=("$m"); in_temp "$m" || intemp=0; done < <(compgen -G "$p")
   elif [[ -e "$p" || -L "$p" ]]; then
-    paths+=("$p")
+    paths+=("$p"); in_temp "$p" || intemp=0
   fi
 done
-if (( \${#paths[@]} == 0 )); then echo "0 0 0"; exit 0; fi
+if (( \${#paths[@]} == 0 )); then echo "0 0 0 0"; exit 0; fi
 # A relative path gets ./ in front, so find never reads a name like -delete as an action.
 for i in "\${!paths[@]}"; do case "\${paths[$i]}" in /*) ;; *) paths[$i]="./\${paths[$i]}";; esac; done
 files=$(find "\${paths[@]}" \\( -type f -o -type l \\) 2>/dev/null | wc -l | tr -d ' ')
 kb=$(du -skc "\${paths[@]}" 2>/dev/null | tail -n1 | cut -f1)
-echo "$files $(( \${kb:-0} * 1024 )) \${#paths[@]}"
+echo "$files $(( \${kb:-0} * 1024 )) \${#paths[@]} $intemp"
 find "\${paths[@]}" \\( -type f -o -type l \\) 2>/dev/null | head -n ${LIST_MAX}
 `;
 
+// Exits 0 when the git repo here sits inside a temp folder.
+const REPO_IN_TEMP_SCRIPT = `
+${TEMP_SH}
+top=$(git rev-parse --show-toplevel 2>/dev/null) && in_temp "$top"
+`;
+
+/** Runs RM_SCRIPT on paths: { files, bytes, found, inTemp, list }, or null if it failed. */
+async function sizeUp($, paths, cwd) {
+  const run = await $.process.run(["bash", "-c", RM_SCRIPT, "blast-radius", ...paths], { cwd, timeoutMs: 15000 });
+  const [head, ...list] = run.stdout.split("\n").filter((l) => l !== "");
+  if (run.exitCode !== 0 || head === undefined) {
+    return null; // timed out on a big tree, say: that's not small
+  }
+  const [files, bytes, found, inTemp] = head.split(" ").map(Number);
+  return { files, bytes, found, inTemp: inTemp === 1, list };
+}
+
+function isSmall(files, bytes) {
+  return files < HOLD_MIN_FILES && bytes < HOLD_MIN_BYTES;
+}
+
+// Words the shell rewrites before rm sees them ($VAR, `cmd`, {a,b}, ~user, a\ b,
+// half-quoted words). They can't be measured here, so they're always held.
+const SHELL_EXPANDED = /[$`{\\"']|^~[^/]/;
+
 async function measureRm($, risk, cwd) {
   if (risk.targets.length === 0) {
-    return { summary: "rm with no paths", lines: [], note: "No paths to expand." };
+    return { summary: "rm with no paths", lines: [], note: "No paths to expand.", small: true };
   }
-  const run = await $.process.run(["bash", "-c", RM_SCRIPT, "blast-radius", ...risk.targets], { cwd, timeoutMs: 15000 });
-  const [head, ...rest] = run.stdout.split("\n").filter((l) => l !== "");
-  const [files, bytes, found] = (head ?? "0 0 0").split(" ").map(Number);
+  const unknown = risk.targets.filter((t) => SHELL_EXPANDED.test(t));
+  if (unknown.length > 0) {
+    return { summary: `${risk.label} ${risk.targets.join(" ")}`, lines: [], note: `Couldn't measure ${unknown.join(" ")}: the shell expands it when the command runs.` };
+  }
+  const sized = await sizeUp($, risk.targets, cwd);
+  if (sized === null) {
+    return { summary: `${risk.label} ${risk.targets.join(" ")} (could not measure it)`, lines: [], note: "Measuring took too long or failed, so the size is unknown." };
+  }
+  const { files, bytes, found, inTemp } = sized;
+  const rest = sized.list;
   if (!found) {
-    return { summary: `delete nothing: no file matches ${risk.targets.join(" ")}`, lines: [], note: "The paths don't exist, so rm has nothing to remove." };
+    return { summary: `delete nothing: no file matches ${risk.targets.join(" ")}`, lines: [], note: "The paths don't exist, so rm has nothing to remove.", small: true };
   }
-  if (!files) {
-    return { summary: `delete ${found} ${found === 1 ? "path" : "paths"} with no files in ${found === 1 ? "it" : "them"}`, lines: [], note: `Paths: ${risk.targets.join(" ")}` };
+  if (inTemp || isSmall(files, bytes)) {
+    return { summary: `delete ${files} ${files === 1 ? "file" : "files"}`, lines: [], small: true };
   }
   return {
     summary: `delete ${files} ${files === 1 ? "file" : "files"} (about ${size(bytes)})`,
@@ -354,6 +444,10 @@ async function measureRm($, risk, cwd) {
 async function measureGit($, risk, cwd) {
   if (risk.kind === "git-push-force") {
     return await measurePush($, risk, cwd);
+  }
+  const scratch = await $.process.run(["bash", "-c", REPO_IN_TEMP_SCRIPT, "blast-radius"], { cwd, timeoutMs: 10000 });
+  if (scratch.exitCode === 0) {
+    return { summary: `${risk.label} in a repo inside a temp folder`, lines: [], small: true };
   }
   if (risk.kind === "git-clean") {
     const flags = [];
@@ -383,8 +477,18 @@ async function measureGit($, risk, cwd) {
       return { summary: "git clean (could not dry-run it)", lines: [], note: run.stderr.trim().slice(0, 200) };
     }
     const gone = run.stdout.split("\n").filter((l) => l.startsWith("Would remove ")).map((l) => l.slice(13));
+    if (gone.length === 0) {
+      return { summary: "remove nothing: no untracked files match", lines: [], small: true };
+    }
+    // A removed folder can hold many files, so count them like rm does. Git
+    // quotes odd names ("..."), which can't be found on disk: those are held.
+    const sized = gone.some((p) => p.startsWith('"')) ? null : await sizeUp($, gone, cwd);
+    if (sized !== null && sized.found === gone.length && isSmall(sized.files, sized.bytes)) {
+      return { summary: `remove ${sized.files} untracked ${sized.files === 1 ? "file" : "files"}`, lines: [], small: true };
+    }
+    const counted = sized === null ? "" : ` (${sized.files} ${sized.files === 1 ? "file" : "files"}, about ${size(sized.bytes)})`;
     return {
-      summary: gone.length === 0 ? "remove nothing: no untracked files match" : `remove ${gone.length} untracked ${gone.length === 1 ? "path" : "paths"}`,
+      summary: `remove ${gone.length} untracked ${gone.length === 1 ? "path" : "paths"}${counted}`,
       lines: gone.slice(0, LIST_MAX),
       more: Math.max(0, gone.length - LIST_MAX),
       note: "From git clean -n. Untracked files are not in git, so they can't be recovered.",
@@ -397,9 +501,12 @@ async function measureGit($, risk, cwd) {
   const rows = status.stdout.split("\n").filter((l) => l.length > 3 && !l.startsWith("??"));
   // reset --hard drops staged and unstaged changes; checkout -- . drops unstaged ones.
   const lost = risk.kind === "git-reset" ? rows : rows.filter((l) => l[1] !== " ");
+  if (lost.length === 0) {
+    return { summary: "discard nothing: no uncommitted changes", lines: [], small: true };
+  }
   const stat = await $.process.run(["git", "diff", "--shortstat", risk.kind === "git-reset" ? "HEAD" : "--"], { cwd, timeoutMs: 15000 });
   return {
-    summary: lost.length === 0 ? "discard nothing: no uncommitted changes" : `discard uncommitted changes in ${lost.length} ${lost.length === 1 ? "file" : "files"}`,
+    summary: `discard uncommitted changes in ${lost.length} ${lost.length === 1 ? "file" : "files"}`,
     lines: lost.slice(0, LIST_MAX).map((l) => `${l.slice(0, 2)} ${l.slice(3)}`),
     more: Math.max(0, lost.length - LIST_MAX),
     note: stat.stdout.trim() !== "" ? `${stat.stdout.trim()}. Uncommitted changes can't be recovered.` : "From git status --porcelain.",

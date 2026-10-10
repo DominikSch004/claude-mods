@@ -1,14 +1,14 @@
 # claude-mods
 
 The Claude Code mods I want on every machine, as one plugin marketplace (`dominik-mods`).
-Each entry points at the mod's upstream repo; nothing is copied here.
+Each entry points at the mod's upstream repo, except `blast-radius`, which is a modified copy in [`plugins/blast-radius`](plugins/blast-radius).
 
 | Mod | What it does | Upstream |
 |---|---|---|
 | `savvy-progress` | Progress bar above the prompt and a live agents panel (`/agents-info`) | [JohnnyVizz/claude-kit](https://github.com/JohnnyVizz/claude-kit/tree/main/plugins/savvy-progress) |
 | `filetree` | IDE-style file tree with git status; shimmers on files Claude reads and writes | [data-goblin/claude-code-filetree](https://github.com/data-goblin/claude-code-filetree) |
 | `skins` | Tool rows with icons, diff/table/Mermaid cards, usage band, fifteen themes (`/skin`) | [hellosverre/claude-skins](https://github.com/hellosverre/claude-skins) |
-| `blast-radius` | Holds `rm -rf`, `git reset --hard`, force pushes and migrations behind Proceed/Cancel | [anthropics/claude-code-playground](https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods/blast-radius) |
+| `blast-radius` | Holds big `rm -rf` (20+ files or 50+ MB), `git reset --hard`, force pushes and migrations behind Proceed/Cancel; skips temp folders | Copy of [anthropics/claude-code-playground](https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods/blast-radius), changed |
 
 Mods need Claude Code 2.1.287 or later.
 
@@ -49,5 +49,6 @@ claude plugin update skins@dominik-mods   # likewise for the others
 ## Notes
 
 - Sources follow each upstream's default branch; nothing is pinned. To pin one, add `"sha": "<commit>"` to its source.
+- `blast-radius` doesn't follow upstream. To change it, edit `plugins/blast-radius`, bump `version` in its `plugin.json` (or `claude plugin update` won't see the change), then push.
 - `filetree` shows in the terminal only in the fullscreen layout (`/tui fullscreen`) at 110+ columns.
 - `blast-radius` waits for a button press. In headless `claude -p` runs nobody can press one, so a risky command waits up to 10 minutes and is then refused.
