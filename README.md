@@ -6,6 +6,7 @@ Each entry points at the mod's upstream repo, except `blast-radius`, which is a 
 | Mod | What it does | Upstream |
 |---|---|---|
 | `savvy-progress` | Progress bar above the prompt and a live agents panel (`/agents-info`) | [JohnnyVizz/claude-kit](https://github.com/JohnnyVizz/claude-kit/tree/main/plugins/savvy-progress) |
+| `savvy-flow` | Not a mod but its companion: `/savvy-flow:savvy-flow <task>` plans, hands the work to five tiered agents (Fable, Opus xhigh/high/medium/low) and reviews it. Their runs get the animated costumes in `savvy-progress` | [JohnnyVizz/claude-kit](https://github.com/JohnnyVizz/claude-kit/tree/main/plugins/savvy-flow) |
 | `filetree` | IDE-style file tree with git status; shimmers on files Claude reads and writes | [data-goblin/claude-code-filetree](https://github.com/data-goblin/claude-code-filetree) |
 | `skins` | Tool rows with icons, diff/table/Mermaid cards, usage band, fifteen themes (`/skin`) | [hellosverre/claude-skins](https://github.com/hellosverre/claude-skins) |
 | `blast-radius` | Holds big `rm -rf` (20+ files or 50+ MB), `git reset --hard`, force pushes and migrations behind Proceed/Cancel; skips temp folders | Copy of [anthropics/claude-code-playground](https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods/blast-radius), changed |
@@ -25,6 +26,7 @@ Windows (PowerShell), or anywhere without bash:
 ```powershell
 claude plugin marketplace add https://github.com/DominikSch004/claude-mods.git
 claude plugin install savvy-progress@dominik-mods
+claude plugin install savvy-flow@dominik-mods
 claude plugin install filetree@dominik-mods
 claude plugin install skins@dominik-mods
 claude plugin install blast-radius@dominik-mods

@@ -7,7 +7,7 @@ set -euo pipefail
 
 MARKETPLACE_REPO="${CLAUDE_MODS_SOURCE:-https://github.com/DominikSch004/claude-mods.git}"  # override with a local path to test
 MARKETPLACE="dominik-mods"
-MODS=(savvy-progress filetree skins blast-radius)
+MODS=(savvy-progress savvy-flow filetree skins blast-radius)
 
 command -v claude >/dev/null || { echo "claude is not on PATH; install Claude Code first." >&2; exit 1; }
 

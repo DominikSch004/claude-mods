@@ -19,6 +19,16 @@
       "homepage": "https://github.com/JohnnyVizz/claude-kit/tree/main/plugins/savvy-progress"
     },
     {
+      "name": "savvy-flow",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/JohnnyVizz/claude-kit.git",
+        "path": "plugins/savvy-flow"
+      },
+      "description": "/savvy-flow:savvy-flow <task>: plans, hands the work to five tiered worker agents and reviews it. Its agents get the animated costumes in savvy-progress.",
+      "homepage": "https://github.com/JohnnyVizz/claude-kit/tree/main/plugins/savvy-flow"
+    },
+    {
       "name": "filetree",
       "source": {
         "source": "url",
