@@ -1,0 +1,50 @@
+{
+  "name": "dominik-mods",
+  "owner": {
+    "name": "Dominik Schneider",
+    "url": "https://github.com/DominikSch004"
+  },
+  "metadata": {
+    "description": "The Claude Code mods I use on every machine, pulled from their upstream repos."
+  },
+  "plugins": [
+    {
+      "name": "savvy-progress",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/JohnnyVizz/claude-kit.git",
+        "path": "plugins/savvy-progress"
+      },
+      "description": "Progress bar above the prompt and a live agents panel (/agents-info).",
+      "homepage": "https://github.com/JohnnyVizz/claude-kit/tree/main/plugins/savvy-progress"
+    },
+    {
+      "name": "filetree",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/data-goblin/claude-code-filetree.git"
+      },
+      "description": "IDE-style file tree with git status and shimmer on files Claude touches.",
+      "homepage": "https://github.com/data-goblin/claude-code-filetree"
+    },
+    {
+      "name": "skins",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/hellosverre/claude-skins.git"
+      },
+      "description": "Tool rows with icons, diff/table/Mermaid cards, a usage band and fifteen themes (/skin).",
+      "homepage": "https://github.com/hellosverre/claude-skins"
+    },
+    {
+      "name": "blast-radius",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-code-playground.git",
+        "path": "claude-code/mods/blast-radius"
+      },
+      "description": "Holds risky shell commands (rm -rf, git reset --hard, force push, migrations) behind Proceed/Cancel.",
+      "homepage": "https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods/blast-radius"
+    }
+  ]
+}
