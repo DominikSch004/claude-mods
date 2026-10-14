@@ -1,7 +1,7 @@
 # claude-mods
 
 The Claude Code mods I want on every machine, as one plugin marketplace (`dominik-mods`).
-Each entry points at the mod's upstream repo, except `blast-radius`, which is a modified copy in [`plugins/blast-radius`](plugins/blast-radius).
+Each entry points at the mod's upstream repo.
 
 | Mod | What it does | Upstream |
 |---|---|---|
@@ -9,7 +9,6 @@ Each entry points at the mod's upstream repo, except `blast-radius`, which is a 
 | `savvy-flow` | Not a mod but its companion: `/savvy-flow:savvy-flow <task>` plans, hands the work to five tiered agents (Fable, Opus xhigh/high/medium/low) and reviews it. Their runs get the animated costumes in `savvy-progress` | [JohnnyVizz/claude-kit](https://github.com/JohnnyVizz/claude-kit/tree/main/plugins/savvy-flow) |
 | `filetree` | IDE-style file tree with git status; shimmers on files Claude reads and writes | [data-goblin/claude-code-filetree](https://github.com/data-goblin/claude-code-filetree) |
 | `skins` | Tool rows with icons, diff/table/Mermaid cards, usage band, fifteen themes (`/skin`) | [hellosverre/claude-skins](https://github.com/hellosverre/claude-skins) |
-| `blast-radius` | Holds big `rm -rf` (20+ files or 50+ MB), `git reset --hard`, force pushes and migrations behind Proceed/Cancel; skips temp folders | Copy of [anthropics/claude-code-playground](https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods/blast-radius), changed |
 
 `setup.sh` also installs [ECC](https://github.com/affaan-m/everything-claude-code) (`ecc@ecc`, its own marketplace): all its agents, skills, commands and hooks, all its npm packages, and every rule pack in `~/.claude/rules/ecc` (language packs load only for matching files). Its hooks need Node.js and npm.
 
@@ -31,14 +30,13 @@ claude plugin install savvy-progress@dominik-mods
 claude plugin install savvy-flow@dominik-mods
 claude plugin install filetree@dominik-mods
 claude plugin install skins@dominik-mods
-claude plugin install blast-radius@dominik-mods
 claude plugin marketplace add https://github.com/affaan-m/everything-claude-code.git
 claude plugin install ecc@ecc
 ```
 
 For ECC, also run `npm ci` in its folder under `~/.claude/plugins/cache/ecc/ecc/<version>`, and copy every folder in its `rules/` into `~/.claude/rules/ecc/`.
 
-Then restart Claude Code. Re-running `setup.sh` is safe: it refreshes the marketplace and installs whatever is missing.
+Then restart Claude Code. Re-running `setup.sh` is safe: it refreshes the marketplace, installs whatever is missing and uninstalls `blast-radius` if an older run put it there.
 
 ## Update
 
@@ -59,6 +57,4 @@ After `claude plugin update ecc@ecc`, re-run `setup.sh`: the new version's folde
 ## Notes
 
 - Sources follow each upstream's default branch; nothing is pinned. To pin one, add `"sha": "<commit>"` to its source.
-- `blast-radius` doesn't follow upstream. To change it, edit `plugins/blast-radius`, bump `version` in its `plugin.json` (or `claude plugin update` won't see the change), then push.
 - `filetree` shows in the terminal only in the fullscreen layout (`/tui fullscreen`) at 110+ columns.
-- `blast-radius` waits for a button press. In headless `claude -p` runs nobody can press one, so a risky command waits up to 10 minutes and is then refused.
