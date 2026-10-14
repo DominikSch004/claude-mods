@@ -11,6 +11,8 @@ Each entry points at the mod's upstream repo, except `blast-radius`, which is a 
 | `skins` | Tool rows with icons, diff/table/Mermaid cards, usage band, fifteen themes (`/skin`) | [hellosverre/claude-skins](https://github.com/hellosverre/claude-skins) |
 | `blast-radius` | Holds big `rm -rf` (20+ files or 50+ MB), `git reset --hard`, force pushes and migrations behind Proceed/Cancel; skips temp folders | Copy of [anthropics/claude-code-playground](https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods/blast-radius), changed |
 
+`setup.sh` also installs [ECC](https://github.com/affaan-m/everything-claude-code) (`ecc@ecc`, its own marketplace): agents, skills, commands and hooks, plus its `common` and `typescript` rule packs in `~/.claude/rules/ecc`. Its hooks need Node.js and npm.
+
 Mods need Claude Code 2.1.287 or later.
 
 ## Set up a machine
@@ -30,7 +32,11 @@ claude plugin install savvy-flow@dominik-mods
 claude plugin install filetree@dominik-mods
 claude plugin install skins@dominik-mods
 claude plugin install blast-radius@dominik-mods
+claude plugin marketplace add https://github.com/affaan-m/everything-claude-code.git
+claude plugin install ecc@ecc
 ```
+
+For ECC, also run `npm ci --omit=dev --ignore-scripts` in its folder under `~/.claude/plugins/cache/ecc/ecc/<version>`, and copy `rules/common` and `rules/typescript` from there into `~/.claude/rules/ecc/`.
 
 Then restart Claude Code. Re-running `setup.sh` is safe: it refreshes the marketplace and installs whatever is missing.
 
@@ -40,6 +46,8 @@ Then restart Claude Code. Re-running `setup.sh` is safe: it refreshes the market
 claude plugin marketplace update dominik-mods
 claude plugin update skins@dominik-mods   # likewise for the others
 ```
+
+After `claude plugin update ecc@ecc`, re-run `setup.sh`: the new version's folder doesn't have ECC's npm packages yet, and its hooks crash until it does. Rule packs aren't refreshed; delete one under `~/.claude/rules/ecc` to have `setup.sh` copy it fresh.
 
 ## Add a mod
 
