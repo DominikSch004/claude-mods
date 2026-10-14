@@ -11,7 +11,7 @@ Each entry points at the mod's upstream repo, except `blast-radius`, which is a 
 | `skins` | Tool rows with icons, diff/table/Mermaid cards, usage band, fifteen themes (`/skin`) | [hellosverre/claude-skins](https://github.com/hellosverre/claude-skins) |
 | `blast-radius` | Holds big `rm -rf` (20+ files or 50+ MB), `git reset --hard`, force pushes and migrations behind Proceed/Cancel; skips temp folders | Copy of [anthropics/claude-code-playground](https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods/blast-radius), changed |
 
-`setup.sh` also installs [ECC](https://github.com/affaan-m/everything-claude-code) (`ecc@ecc`, its own marketplace): agents, skills, commands and hooks, plus its `common` and `typescript` rule packs in `~/.claude/rules/ecc`. Its hooks need Node.js and npm.
+`setup.sh` also installs [ECC](https://github.com/affaan-m/everything-claude-code) (`ecc@ecc`, its own marketplace): all its agents, skills, commands and hooks, all its npm packages, and every rule pack in `~/.claude/rules/ecc` (language packs load only for matching files). Its hooks need Node.js and npm.
 
 Mods need Claude Code 2.1.287 or later.
 
@@ -36,7 +36,7 @@ claude plugin marketplace add https://github.com/affaan-m/everything-claude-code
 claude plugin install ecc@ecc
 ```
 
-For ECC, also run `npm ci --omit=dev --ignore-scripts` in its folder under `~/.claude/plugins/cache/ecc/ecc/<version>`, and copy `rules/common` and `rules/typescript` from there into `~/.claude/rules/ecc/`.
+For ECC, also run `npm ci` in its folder under `~/.claude/plugins/cache/ecc/ecc/<version>`, and copy every folder in its `rules/` into `~/.claude/rules/ecc/`.
 
 Then restart Claude Code. Re-running `setup.sh` is safe: it refreshes the marketplace and installs whatever is missing.
 

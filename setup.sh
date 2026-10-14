@@ -37,11 +37,11 @@ for mod in "${MODS[@]}"; do
 done
 
 # ECC (everything-claude-code) comes from its own marketplace. Claude Code
-# doesn't install its npm packages, and its hooks crash without them, so do
-# that here. Plugins can't ship rules either, so copy the rule packs; a pack
-# that's already there is left alone.
+# doesn't install its npm packages, and its hooks crash without them, so
+# install all of them here. Plugins can't ship rules either, so copy every
+# rule pack; language packs only load for matching files. A pack that's
+# already there is left alone.
 ECC_REPO="https://github.com/affaan-m/everything-claude-code.git"
-ECC_RULES=(common typescript)
 
 ensure_marketplace ecc "$ECC_REPO"
 retry claude plugin install ecc@ecc --scope user
@@ -49,13 +49,14 @@ retry claude plugin install ecc@ecc --scope user
 ecc_dir=$(ls -d ~/.claude/plugins/cache/ecc/ecc/*/ | sort -V | tail -1)
 if command -v npm >/dev/null; then
   [ -f "${ecc_dir}node_modules/.package-lock.json" ] ||
-    (cd "$ecc_dir" && retry npm ci --omit=dev --ignore-scripts --no-audit --no-fund)
+    (cd "$ecc_dir" && retry npm ci --no-audit --no-fund)
 else
   echo "ECC's hooks need Node.js and npm; install them, then re-run this script." >&2
 fi
 mkdir -p ~/.claude/rules/ecc
-for pack in "${ECC_RULES[@]}"; do
-  [ -d ~/.claude/rules/ecc/"$pack" ] || cp -R "${ecc_dir}rules/$pack" ~/.claude/rules/ecc/
+for pack in "${ecc_dir}"rules/*/; do
+  pack=${pack%/}  # with the slash, macOS cp copies the contents, not the folder
+  [ -d ~/.claude/rules/ecc/"${pack##*/}" ] || cp -R "$pack" ~/.claude/rules/ecc/
 done
 
 echo
